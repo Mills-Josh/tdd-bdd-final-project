@@ -27,7 +27,7 @@ import os
 import logging
 import unittest
 from decimal import Decimal
-from service.models import Product, Category, db
+from service.models import Product, Category, db, DataValidationError
 from service import app
 from tests.factories import ProductFactory
 
@@ -104,3 +104,133 @@ class TestProductModel(unittest.TestCase):
     #
     # ADD YOUR TEST CASES HERE
     #
+    def test_read_a_product(self):
+        """It should Read a product after being added"""
+        product = ProductFactory()
+        app.logger.info(f"Product {product.name} created")
+        product.id = None
+        product.create()
+        self.assertIsNotNone(product.id)
+        # Fetch the product back and confirm properties
+        fetched = Product.find(product.id)
+        self.assertEqual(fetched.id, product.id)
+        self.assertEqual(fetched.name, product.name)
+        self.assertEqual(fetched.description, product.description)
+        self.assertEqual(fetched.price, product.price)
+        self.assertEqual(fetched.category, product.category)
+    
+    def test_update_a_product(self):
+        """It should Update a product"""
+        product = ProductFactory()
+        app.logger.info(f"Product {product.name} created")
+        product.id = None
+        product.create()
+        self.assertIsNotNone(product.id)
+        old_id = product.id
+        product.description = "Updated Description"
+        product.update()
+        self.assertEqual(product.id, old_id)
+        self.assertEqual(product.description, "Updated Description")
+
+        # Confirm no old copy exists
+        products = Product.all()
+        self.assertEqual(len(products), 1)
+        # Confirm copy found has new description
+        fetched = products[0]
+        self.assertEqual(fetched.id, product.id)
+        self.assertEqual(fetched.description, product.description)
+
+        # Their "solution" doesn't even code coverage?
+        product_invalid = ProductFactory()
+        product_invalid.id = None
+        with self.assertRaises(DataValidationError):
+            product_invalid.update()
+    
+    def test_delete_a_product(self):
+        """It should Delete a product"""
+        product = ProductFactory()
+        product.id = None
+        product.create()
+        products = Product.all()
+        self.assertEqual(len(products), 1)
+        product.delete()
+        products = Product.all()
+        self.assertEqual(len(products), 0)
+
+    def test_list_all_products(self):
+        """It should list multiple products"""
+        self.assertEqual(len(Product.all()), 0)
+        for _ in range(5):
+            product = ProductFactory()
+            product.create()
+
+        self.assertEqual(len(Product.all()), 5)
+
+    def test_find_by_name(self):
+        """It should find product by name"""
+        self.assertEqual(len(Product.all()), 0)
+        products = ProductFactory.create_batch(5)
+        name = products[0].name
+        # See test_find_by_availability for buggy test runner debugging
+        # count = 0
+        for product in products:
+            product.create()
+        #     if product.name == name:
+        #         count+=1
+        count = len([product for product in products if product.name == name])
+        found = Product.find_by_name(name)
+        self.assertEqual(found.count(), count)
+        for product in found:
+            self.assertEqual(product.name, name)
+
+    def test_find_by_availability(self):
+        """It should find product by availability"""
+        self.assertEqual(len(Product.all()), 0)
+        products = ProductFactory.create_batch(5)
+        availability = products[0].available
+        # count = 0
+        # print(f"Starting Availability: {availability}")
+        for product in products:
+        #     if product.available == availability:
+        #         print(f"Matching availability: {product.available} = {availability}")
+        #         count+=1
+            product.create()
+        # APPARENTLY MINE MERGES TWO SEPARATE ATTEMPTS' VARIABLES?!?!?
+        their_count = len([product for product in products if product.available == availability])
+        # How does their version work differently than mine?
+        # self.assertEqual(count, their_count)
+        found = Product.find_by_availability(availability)
+        self.assertEqual(found.count(), their_count)
+        for product in found:
+            self.assertEqual(product.available, availability)
+            
+    def test_find_by_category(self):
+        """It should find product by category"""
+        self.assertEqual(len(Product.all()), 0)
+        products = ProductFactory.create_batch(10)
+        category = products[0].category
+            # See availability for bug
+            # count = 0
+        for product in products:
+            product.create()
+            #     if product.category == category:
+            #         count+=1
+        count = len([product for product in products if product.category == category])
+        found = Product.find_by_category(category)
+        self.assertEqual(found.count(), count)
+        for product in found:
+            self.assertEqual(product.category, category)
+
+    #They forgot price?
+    def test_find_by_price(self):
+        """It should find product by price"""
+        self.assertEqual(len(Product.all()), 0)
+        products = ProductFactory.create_batch(10)
+        price = products[0].price
+        for product in products:
+            product.create()
+        count = len([product for product in products if product.price == price])
+        found = Product.find_by_price(price)
+        self.assertEqual(found.count(), count)
+        for product in found:
+            self.assertEqual(product.price, price)
